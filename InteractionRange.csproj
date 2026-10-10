@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AssemblyName>InteractionRange</AssemblyName></PropertyGroup>
+  <ItemGroup><Compile Include="src\**\*.cs" /></ItemGroup>
+</Project>

@@ -1,0 +1,28 @@
+# Internal workflow records (keep local, never publish)
+AGENTS.md
+CLAUDE.md
+TESTING.md
+*PLAN*.md
+*HANDOFF*.md
+BACKLOG.md
+SESSION*.md
+.local/
+.agents/
+.codex/
+.claude/
+
+# Build output and packages
+bin/
+obj/
+**/bin/
+**/obj/
+dist/
+artifacts/
+*.zip
+
+# Editor, game and loader files
+.vs/
+*.user
+*.suo
+*.log
+*.cfg

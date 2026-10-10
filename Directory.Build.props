@@ -1,0 +1,42 @@
+<Project>
+  <!-- Optional, ignored machine-specific paths (for example GamePath). -->
+  <Import Project="$(MSBuildThisFileDirectory).local\LocalPaths.props" Condition="Exists('$(MSBuildThisFileDirectory).local\LocalPaths.props')" />
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <BepInExCorePath Condition="'$(BepInExCorePath)' == ''">$(MSBuildThisFileDirectory).local\dependencies\BepInEx5\BepInEx\core</BepInExCorePath>
+    <GameManagedPath>$(GamePath)\Obenseuer_Data\Managed</GameManagedPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).local\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory).local\bin\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildThisFileDirectory)=/InteractionRange/</PathMap>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="BepInEx"><HintPath>$(BepInExCorePath)\BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(BepInExCorePath)\0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(GameManagedPath)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameManagedPath)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManagedPath)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(GameManagedPath)\UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="CheckExternalReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(GamePath)' == ''" Text="GamePath is not set. Pass -GamePath to the scripts or -p:GamePath=... to dotnet, or create .local/LocalPaths.props setting GamePath." />
+    <Error Condition="'$(GamePath)' != '' And !Exists('$(GameManagedPath)\Assembly-CSharp.dll')" Text="GamePath must point to an Obenseuer installation (Obenseuer_Data\Managed\Assembly-CSharp.dll not found). Pass -GamePath to the scripts or -p:GamePath=... to dotnet, or set it in .local/LocalPaths.props." />
+    <Error Condition="!Exists('$(BepInExCorePath)\BepInEx.dll') Or !Exists('$(BepInExCorePath)\0Harmony.dll')" Text="BepInExCorePath must contain BepInEx 5.4.23.5 core assemblies." />
+    <ItemGroup>
+      <_PinnedLoaderReference Include="$(BepInExCorePath)\BepInEx.dll"><ExpectedHash>8255B28902886085C578B9E427D3073C97002DB85176D2090CDEDA90EF14CE70</ExpectedHash></_PinnedLoaderReference>
+      <_PinnedLoaderReference Include="$(BepInExCorePath)\0Harmony.dll"><ExpectedHash>1A21CC03424FC82C3DD1346905D16494536B9595AE4162228D99FB7C285C1031</ExpectedHash></_PinnedLoaderReference>
+    </ItemGroup>
+    <GetFileHash Files="@(_PinnedLoaderReference)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_HashedLoaderReference" />
+    </GetFileHash>
+    <Error Condition="'%(_HashedLoaderReference.FileHash)' != '%(_HashedLoaderReference.ExpectedHash)'" Text="%(_HashedLoaderReference.Identity) differs from the pinned BepInEx Windows x64 5.4.23.5 references." />
+  </Target>
+</Project>

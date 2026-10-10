@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AssemblyName>InteractionRange.Tests</AssemblyName><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="InteractionRange.csproj" />
+    <Compile Include="tests\**\*.cs" />
+  </ItemGroup>
+</Project>
