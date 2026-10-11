@@ -46,17 +46,25 @@ internal static class Tests
         Console.WriteLine("Harmony: " + typeof(Harmony).Assembly.FullName);
         BepInEx.Logging.Logger.Listeners.Add(Log);
         RangePatches.Log = BepInEx.Logging.Logger.CreateLogSource("InteractionRange.Tests");
-        Check("BepInEx 5 reference and plugin base", () =>
+        Check("selected loader references and plugin base", () =>
         {
             var pluginAssembly = typeof(Plugin).Assembly;
             var references = pluginAssembly.GetReferencedAssemblies();
             var loaderReferences = references.Where(reference => reference.Name.StartsWith("BepInEx", StringComparison.OrdinalIgnoreCase)).ToArray();
+#if BEPINEX6
+            True(loaderReferences.Length == 2);
+            True(loaderReferences.Any(reference => reference.Name == "BepInEx.Core" && reference.Version == new Version(6, 0, 0, 0)));
+            True(loaderReferences.Any(reference => reference.Name == "BepInEx.Unity.Mono" && reference.Version == new Version(6, 0, 0, 0)));
+            True(typeof(Plugin).BaseType == typeof(BepInEx.Unity.Mono.BaseUnityPlugin));
+#else
             True(loaderReferences.Length == 1);
             var loader = loaderReferences.Single();
             True(loader.Name == "BepInEx");
             True(loader.Version == new Version(5, 4, 23, 5));
             True(typeof(Plugin).BaseType == typeof(BepInEx.BaseUnityPlugin));
+#endif
             True(Plugin.Guid == "com.skeptic043.obenseuer.interactionrange");
+            True(Plugin.Version == "1.0.1");
         });
         Check("no compile-time game references; game members are resolved by name", () =>
             True(!typeof(Plugin).Assembly.GetReferencedAssemblies().Any(reference => reference.Name == "Assembly-CSharp")));

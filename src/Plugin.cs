@@ -1,6 +1,11 @@
 using System;
 using BepInEx;
 using HarmonyLib;
+#if BEPINEX6
+using BaseUnityPlugin = BepInEx.Unity.Mono.BaseUnityPlugin;
+#else
+using BaseUnityPlugin = BepInEx.BaseUnityPlugin;
+#endif
 
 namespace InteractionRange
 {
@@ -9,7 +14,7 @@ namespace InteractionRange
     {
         public const string Guid = "com.skeptic043.obenseuer.interactionrange";
         public const string Name = "Interaction Range";
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
         private Harmony harmony;
         private RangeSettings settings;
         private bool quitting;

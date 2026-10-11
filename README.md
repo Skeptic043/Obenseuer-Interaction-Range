@@ -6,9 +6,10 @@ Reach a little farther. Pick up items, open doors and containers, and talk to pe
 
 ### Manual installation
 
-1. Install [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5) (`BepInEx_win_x64_5.4.23.5.zip`) in your Obenseuer game folder, following its installation instructions. Obenseuer mods use both BepInEx 5 and BepInEx 6, so make sure you download BepInEx 5. This mod has not been tested with BepInEx 6.
-2. Download and extract the Interaction Range ZIP. Copy its `BepInEx/plugins/InteractionRange` folder into `BepInEx/plugins` in your Obenseuer folder.
-3. Launch Obenseuer normally.
+1. Install either [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5) (`BepInEx_win_x64_5.4.23.5.zip`) or [BepInEx 6.0.0-be.755 Unity Mono](https://builds.bepinex.dev/projects/bepinex_be/755/BepInEx-Unity.Mono-win-x64-6.0.0-be.755%2B3fab71a.zip) in your Obenseuer game folder, following its installation instructions.
+2. Download the Interaction Range ZIP that matches your installed loader. BepInEx 5 and BepInEx 6 use different plugin DLLs, so do not interchange the two files.
+3. Extract the ZIP and copy its `BepInEx/plugins/InteractionRange` folder into `BepInEx/plugins` in your Obenseuer folder.
+4. Launch Obenseuer normally.
 
 ## How it works
 
@@ -16,7 +17,7 @@ Interaction Range extends how far away you can use things you're looking at. Pic
 
 ## Configuration
 
-After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactionrange.cfg`, or use the BepInEx 5 version of [BepInEx Configuration Manager](https://github.com/BepInEx/BepInEx.ConfigurationManager).
+After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactionrange.cfg`. BepInEx 5 users can also use [BepInEx Configuration Manager](https://github.com/BepInEx/BepInEx.ConfigurationManager). Configuration Manager has not been validated with this mod on BepInEx 6 Unity Mono.
 
 | Setting | Default | Options |
 | --- | --- | --- |
@@ -25,6 +26,8 @@ After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactio
 ## Compatibility
 
 No known incompatibilities.
+
+Separate builds are provided for BepInEx 5.4.23.5 and BepInEx 6.0.0-be.755 Unity Mono on Windows x64. The 1.0.1 BepInEx 6 package passed the same offline behavior and game-assembly checks as the BepInEx 5 package, but it has not received a new in-game test.
 
 ## AI Use
 

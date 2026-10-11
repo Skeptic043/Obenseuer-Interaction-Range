@@ -7,36 +7,56 @@
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <BepInExCorePath Condition="'$(BepInExCorePath)' == ''">$(MSBuildThisFileDirectory).local\dependencies\BepInEx5\BepInEx\core</BepInExCorePath>
+    <LoaderTarget Condition="'$(LoaderTarget)' == ''">BepInEx5</LoaderTarget>
+    <BepInEx5CorePath Condition="'$(BepInEx5CorePath)' == ''">$(MSBuildThisFileDirectory).local\dependencies\BepInEx5\BepInEx\core</BepInEx5CorePath>
+    <BepInEx6CorePath Condition="'$(BepInEx6CorePath)' == ''">$(MSBuildThisFileDirectory).local\dependencies\BepInEx6-755\BepInEx\core</BepInEx6CorePath>
+    <BepInExCorePath Condition="'$(BepInExCorePath)' == '' And '$(LoaderTarget)' == 'BepInEx5'">$(BepInEx5CorePath)</BepInExCorePath>
+    <BepInExCorePath Condition="'$(BepInExCorePath)' == '' And '$(LoaderTarget)' == 'BepInEx6'">$(BepInEx6CorePath)</BepInExCorePath>
+    <DefineConstants Condition="'$(LoaderTarget)' == 'BepInEx6'">$(DefineConstants);BEPINEX6</DefineConstants>
     <GameManagedPath>$(GamePath)\Obenseuer_Data\Managed</GameManagedPath>
-    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).local\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
-    <OutputPath>$(MSBuildThisFileDirectory).local\bin\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).local\obj\$(LoaderTarget)\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory).local\bin\$(LoaderTarget)\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Deterministic>true</Deterministic>
     <PathMap>$(MSBuildThisFileDirectory)=/InteractionRange/</PathMap>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(LoaderTarget)' == 'BepInEx5'">
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="BepInEx"><HintPath>$(BepInExCorePath)\BepInEx.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(BepInExCorePath)\0Harmony.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(LoaderTarget)' == 'BepInEx6'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="BepInEx.Core"><HintPath>$(BepInExCorePath)\BepInEx.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepInEx.Unity.Mono"><HintPath>$(BepInExCorePath)\BepInEx.Unity.Mono.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(BepInExCorePath)\0Harmony.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="Assembly-CSharp"><HintPath>$(GameManagedPath)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine"><HintPath>$(GameManagedPath)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManagedPath)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(GameManagedPath)\UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
   <Target Name="CheckExternalReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(LoaderTarget)' != 'BepInEx5' And '$(LoaderTarget)' != 'BepInEx6'" Text="LoaderTarget must be BepInEx5 or BepInEx6." />
     <Error Condition="'$(GamePath)' == ''" Text="GamePath is not set. Pass -GamePath to the scripts or -p:GamePath=... to dotnet, or create .local/LocalPaths.props setting GamePath." />
     <Error Condition="'$(GamePath)' != '' And !Exists('$(GameManagedPath)\Assembly-CSharp.dll')" Text="GamePath must point to an Obenseuer installation (Obenseuer_Data\Managed\Assembly-CSharp.dll not found). Pass -GamePath to the scripts or -p:GamePath=... to dotnet, or set it in .local/LocalPaths.props." />
-    <Error Condition="!Exists('$(BepInExCorePath)\BepInEx.dll') Or !Exists('$(BepInExCorePath)\0Harmony.dll')" Text="BepInExCorePath must contain BepInEx 5.4.23.5 core assemblies." />
-    <ItemGroup>
+    <Error Condition="'$(LoaderTarget)' == 'BepInEx5' And (!Exists('$(BepInExCorePath)\BepInEx.dll') Or !Exists('$(BepInExCorePath)\0Harmony.dll'))" Text="BepInExCorePath must contain BepInEx 5.4.23.5 core assemblies." />
+    <Error Condition="'$(LoaderTarget)' == 'BepInEx6' And (!Exists('$(BepInExCorePath)\BepInEx.Core.dll') Or !Exists('$(BepInExCorePath)\BepInEx.Unity.Mono.dll') Or !Exists('$(BepInExCorePath)\0Harmony.dll'))" Text="BepInExCorePath must contain BepInEx 6.0.0-be.755 Unity Mono core assemblies." />
+    <ItemGroup Condition="'$(LoaderTarget)' == 'BepInEx5'">
       <_PinnedLoaderReference Include="$(BepInExCorePath)\BepInEx.dll"><ExpectedHash>8255B28902886085C578B9E427D3073C97002DB85176D2090CDEDA90EF14CE70</ExpectedHash></_PinnedLoaderReference>
       <_PinnedLoaderReference Include="$(BepInExCorePath)\0Harmony.dll"><ExpectedHash>1A21CC03424FC82C3DD1346905D16494536B9595AE4162228D99FB7C285C1031</ExpectedHash></_PinnedLoaderReference>
+    </ItemGroup>
+    <ItemGroup Condition="'$(LoaderTarget)' == 'BepInEx6'">
+      <_PinnedLoaderReference Include="$(BepInExCorePath)\BepInEx.Core.dll"><ExpectedHash>CAF62A81D38A5E525F0E43CBC2D7FECDA8E9CCA0B5A1F03C33BDD809FECA8750</ExpectedHash></_PinnedLoaderReference>
+      <_PinnedLoaderReference Include="$(BepInExCorePath)\BepInEx.Unity.Mono.dll"><ExpectedHash>13584ACF55914D5F1C6226677DE23105099C996051FE3F78E0D7DC0E86FB7A1C</ExpectedHash></_PinnedLoaderReference>
+      <_PinnedLoaderReference Include="$(BepInExCorePath)\0Harmony.dll"><ExpectedHash>9710C782B13742FA23B9FC2C3608263BA6F1D08EF1342898FC26A8F539D3F247</ExpectedHash></_PinnedLoaderReference>
     </ItemGroup>
     <GetFileHash Files="@(_PinnedLoaderReference)" Algorithm="SHA256">
       <Output TaskParameter="Items" ItemName="_HashedLoaderReference" />
     </GetFileHash>
-    <Error Condition="'%(_HashedLoaderReference.FileHash)' != '%(_HashedLoaderReference.ExpectedHash)'" Text="%(_HashedLoaderReference.Identity) differs from the pinned BepInEx Windows x64 5.4.23.5 references." />
+    <Error Condition="'%(_HashedLoaderReference.FileHash)' != '%(_HashedLoaderReference.ExpectedHash)'" Text="%(_HashedLoaderReference.Identity) differs from the pinned $(LoaderTarget) Windows x64 references." />
   </Target>
 </Project>
