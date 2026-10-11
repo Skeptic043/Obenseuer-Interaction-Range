@@ -34,4 +34,4 @@ AI was used to write all of the code in this project. The original design direct
 
 [Report an issue](https://github.com/Skeptic043/Obenseuer-Interaction-Range/issues) with your settings and `BepInEx/LogOutput.log`.
 
-[Source code](https://github.com/Skeptic043/Obenseuer-Interaction-Range) · [Changelog](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/CHANGELOG.md) · [Build instructions](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/BUILDING.md) · [MIT License](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/LICENSE) · [Support on Ko-fi](https://ko-fi.com/skeptic043) · skeptic043
+[Nexus Mods](https://www.nexusmods.com/obeseuer/mods/26) · [Source code](https://github.com/Skeptic043/Obenseuer-Interaction-Range) · [Changelog](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/CHANGELOG.md) · [Build instructions](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/BUILDING.md) · [MIT License](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/LICENSE) · [Support on Ko-fi](https://ko-fi.com/skeptic043) · skeptic043
