@@ -9,7 +9,7 @@ namespace InteractionRange
     {
         public const string Guid = "com.skeptic043.obenseuer.interactionrange";
         public const string Name = "Interaction Range";
-        public const string Version = "0.2.1";
+        public const string Version = "1.0.0";
         private Harmony harmony;
         private RangeSettings settings;
         private bool quitting;

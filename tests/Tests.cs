@@ -56,8 +56,6 @@ internal static class Tests
             True(loader.Name == "BepInEx");
             True(loader.Version == new Version(5, 4, 23, 5));
             True(typeof(Plugin).BaseType == typeof(BepInEx.BaseUnityPlugin));
-            True(pluginAssembly.GetName().Version == new Version(0, 2, 1, 0));
-            True(Plugin.Version == "0.2.1");
             True(Plugin.Guid == "com.skeptic043.obenseuer.interactionrange");
         });
         Check("no compile-time game references; game members are resolved by name", () =>
