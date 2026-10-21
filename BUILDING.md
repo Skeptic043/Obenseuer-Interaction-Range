@@ -5,7 +5,7 @@ Requirements: Windows, Windows PowerShell 5.1 or PowerShell 7, a .NET SDK suppor
 - [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5)
 - [BepInEx 6.0.0-be.755 Unity Mono](https://builds.bepinex.dev/projects/bepinex_be/755/BepInEx-Unity.Mono-win-x64-6.0.0-be.755%2B3fab71a.zip)
 
-The game references can come from any Obenseuer version. The mod was last tested in game on 0.5.05 (Unity 6000.0.77f1). Extract each loader separately. The default reference directories are `.local/dependencies/BepInEx5/BepInEx/core` and `.local/dependencies/BepInEx6-755/BepInEx/core`. Every loader assembly is checked against the pinned release hash, and the build rejects missing, mixed, or different references.
+The game references can come from any Obenseuer version. Version 1.0.2 was startup-tested against Steam build 25969064 (Unity 6000.0.77f1). Extract each loader separately. The default reference directories are `.local/dependencies/BepInEx5/BepInEx/core` and `.local/dependencies/BepInEx6-755/BepInEx/core`. Every loader assembly is checked against the pinned release hash, and the build rejects missing, mixed, or different references.
 
 Select one loader for an individual build or test:
 
@@ -40,4 +40,4 @@ The package script writes one `InteractionRange-<version>.zip` to `dist/` from a
 
 The script checks the extracted file list, DLL hashes, assembly and plugin versions, and loader references. It runs each loader's metadata scanner against the two-DLL folder and verifies that exactly one matching plugin is discovered, including a simulated cached upgrade from the old one-DLL layout. It also scans the package for local path markers, then builds and tests both targets from a fresh internal source stage and compares each DLL with its original candidate. The source stage is a validation input and is not distributed.
 
-The tests use each loader's actual configuration, metadata scanner, and Harmony libraries, the game method bodies, synthetic managed objects, and Harmony wrappers for behavior that can run outside Unity. They do not establish live targeting, configuration-manager rendering, upgrade behavior inside the game, or gameplay compatibility. The 1.0.2 universal package has no fresh live test.
+The tests use each loader's actual configuration, metadata scanner, and Harmony libraries, the game method bodies, synthetic managed objects, and Harmony wrappers for behavior that can run outside Unity. They do not establish live targeting, configuration-manager rendering, upgrade behavior inside the game, or gameplay compatibility. The 1.0.2 universal layout was launched under both pinned loaders with one plugin instance and its existing setting, but no controlled interaction-range test was performed.

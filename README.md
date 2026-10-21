@@ -27,7 +27,7 @@ After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactio
 
 No known incompatibilities.
 
-One package supports BepInEx 5.4.23.5 and BepInEx 6.0.0-be.755 Unity Mono on Windows x64. Version 1.0.2 passed offline behavior, game-assembly, package-layout, and loader-discovery checks for both targets, but the universal package has not received fresh in-game upgrade testing on either loader.
+One package supports BepInEx 5.4.23.5 and BepInEx 6.0.0-be.755 Unity Mono on Windows x64. The version 1.0.2 two-DLL layout was tested under both loaders, and each loader initialized its matching DLL once with the existing `1.2` setting.
 
 ## AI Use
 
