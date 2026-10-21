@@ -6,10 +6,9 @@ Reach a little farther. Pick up items, open doors and containers, and talk to pe
 
 ### Manual installation
 
-1. Install either [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5) (`BepInEx_win_x64_5.4.23.5.zip`) or [BepInEx 6.0.0-be.755 Unity Mono](https://builds.bepinex.dev/projects/bepinex_be/755/BepInEx-Unity.Mono-win-x64-6.0.0-be.755%2B3fab71a.zip) in your Obenseuer game folder, following its installation instructions.
-2. Download the Interaction Range ZIP.
-3. Extract the ZIP into your Obenseuer folder. The package includes separate BepInEx 5 and BepInEx 6 DLLs in `BepInEx/plugins/InteractionRange`, and your loader selects the matching one.
-4. Launch Obenseuer normally.
+1. Install either [BepInEx 5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5) or [BepInEx 6 Unity Mono](https://builds.bepinex.dev/projects/bepinex_be/755/BepInEx-Unity.Mono-win-x64-6.0.0-be.755%2B3fab71a.zip) in your Obenseuer game folder.
+2. Download Interaction Range, then extract the ZIP into the Obenseuer game folder. The same ZIP supports both BepInEx versions.
+3. Launch Obenseuer normally.
 
 ## How it works
 
@@ -17,7 +16,7 @@ Interaction Range extends how far away you can use things you're looking at. Pic
 
 ## Configuration
 
-After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactionrange.cfg`. BepInEx 5 users can also use [BepInEx Configuration Manager](https://github.com/BepInEx/BepInEx.ConfigurationManager). Configuration Manager has not been validated with this mod on BepInEx 6 Unity Mono.
+After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactionrange.cfg`. BepInEx 5 users can also use [BepInEx Configuration Manager](https://github.com/BepInEx/BepInEx.ConfigurationManager).
 
 | Setting | Default | Options |
 | --- | --- | --- |
@@ -25,9 +24,7 @@ After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactio
 
 ## Compatibility
 
-No known incompatibilities.
-
-One package supports BepInEx 5.4.23.5 and BepInEx 6.0.0-be.755 Unity Mono on Windows x64. The version 1.0.2 two-DLL layout was tested under both loaders, and each loader initialized its matching DLL once with the existing `1.2` setting.
+There are no known incompatibilities. Interaction Range supports BepInEx 5 and BepInEx 6 Unity Mono on Windows.
 
 ## AI Use
 
@@ -35,6 +32,6 @@ AI was used to write all of the code in this project. The original design direct
 
 ## Issues and links
 
-[Report an issue](https://github.com/Skeptic043/Obenseuer-Interaction-Range/issues) with your settings and `BepInEx/LogOutput.log`.
+[Report an issue](https://github.com/Skeptic043/Obenseuer-Interaction-Range/issues) and include `BepInEx/LogOutput.log`. Check the log for local paths or other personal information before uploading it.
 
 [Nexus Mods](https://www.nexusmods.com/obeseuer/mods/26) · [Source code](https://github.com/Skeptic043/Obenseuer-Interaction-Range) · [Changelog](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/CHANGELOG.md) · [Build instructions](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/BUILDING.md) · [MIT License](https://github.com/Skeptic043/Obenseuer-Interaction-Range/blob/main/LICENSE) · [Support on Ko-fi](https://ko-fi.com/skeptic043) · skeptic043
