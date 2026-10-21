@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.0.2
+
+- Replaced the separate BepInEx 5 and BepInEx 6 downloads with one package that includes both loader-specific DLLs.
+- Kept the plugin ID, configuration file, setting, and default unchanged. Existing settings carry forward when the package is extracted over an official 1.0.0 or 1.0.1 installation.
+- Moved the packaged README, changelog, and license into the mod folder so they do not overwrite another mod's root-level files.
+- Both DLLs passed the existing offline behavior and game-assembly checks, plus package-layout, metadata, loader-discovery, and simulated cached-upgrade checks. The universal package has not received fresh in-game upgrade testing.
+
 ## Version 1.0.1
 
 - Added a separate build for BepInEx 6.0.0-be.755 Unity Mono on Windows x64.

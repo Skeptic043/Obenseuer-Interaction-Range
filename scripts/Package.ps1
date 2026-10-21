@@ -64,6 +64,48 @@ function Resolve-Paths([string]$loaderTarget, [string]$corePath) {
     return ($resolved | ConvertFrom-Json).Properties
 }
 
+function Get-AssemblyFacts([string]$path) {
+    $assembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($path)
+    try {
+        $pluginAttributes = @($assembly.MainModule.Types | ForEach-Object { $_.CustomAttributes } |
+            Where-Object { $_.AttributeType.FullName -eq 'BepInEx.BepInPlugin' })
+        if ($pluginAttributes.Count -ne 1 -or $pluginAttributes[0].ConstructorArguments.Count -ne 3) {
+            throw "$path must contain exactly one three-argument BepInPlugin attribute."
+        }
+        $plugin = $pluginAttributes[0]
+        return [pscustomobject]@{
+            assemblyName = $assembly.Name.Name
+            assemblyVersion = $assembly.Name.Version.ToString()
+            pluginGuid = [string]$plugin.ConstructorArguments[0].Value
+            pluginName = [string]$plugin.ConstructorArguments[1].Value
+            pluginVersion = [string]$plugin.ConstructorArguments[2].Value
+            loaderReferences = @($assembly.MainModule.AssemblyReferences |
+                Where-Object { $_.Name.StartsWith('BepInEx', [StringComparison]::Ordinal) } |
+                Sort-Object Name | ForEach-Object { $_.Name + ',' + $_.Version })
+        }
+    }
+    finally { $assembly.Dispose() }
+}
+
+function Assert-AssemblyFacts([string]$path, [string]$loaderTarget, [string]$version) {
+    $facts = Get-AssemblyFacts $path
+    if ($facts.assemblyName -cne 'InteractionRange') { throw "$path has assembly name $($facts.assemblyName)." }
+    if ($facts.assemblyVersion -cne "$version.0") { throw "$path has assembly version $($facts.assemblyVersion), expected $version.0." }
+    if ($facts.pluginGuid -cne 'com.skeptic043.obenseuer.interactionrange') { throw "$path has plugin GUID $($facts.pluginGuid)." }
+    if ($facts.pluginName -cne 'Interaction Range') { throw "$path has plugin name $($facts.pluginName)." }
+    if ($facts.pluginVersion -cne $version) { throw "$path has plugin version $($facts.pluginVersion), expected $version." }
+    $expectedReferences = if ($loaderTarget -eq 'BepInEx5') {
+        @('BepInEx,5.4.23.5')
+    }
+    else {
+        @('BepInEx.Core,6.0.0.0','BepInEx.Unity.Mono,6.0.0.0')
+    }
+    if (($facts.loaderReferences -join "`n") -cne ($expectedReferences -join "`n")) {
+        throw "$path has unexpected loader references: $($facts.loaderReferences -join ', ')."
+    }
+    return $facts
+}
+
 # Resolve omitted paths the same way the builds do, then pass them explicitly to every check.
 $bep5Paths = Resolve-Paths 'BepInEx5' $BepInEx5CorePath
 $bep6Paths = Resolve-Paths 'BepInEx6' $BepInEx6CorePath
@@ -72,6 +114,7 @@ $gamePath = [IO.Path]::GetFullPath($bep5Paths.GamePath).TrimEnd('\')
 if ($gamePath -ne [IO.Path]::GetFullPath($bep6Paths.GamePath).TrimEnd('\')) { throw 'Loader targets resolved different GamePath values.' }
 $bep5CorePath = [IO.Path]::GetFullPath($bep5Paths.BepInExCorePath).TrimEnd('\')
 $bep6CorePath = [IO.Path]::GetFullPath($bep6Paths.BepInExCorePath).TrimEnd('\')
+Add-Type -Path (Join-Path $bep5CorePath 'Mono.Cecil.dll')
 
 foreach ($target in @(@('BepInEx5',$bep5CorePath), @('BepInEx6',$bep6CorePath))) {
     & (Join-Path $PSScriptRoot 'Build.ps1') -GamePath $gamePath -BepInExCorePath $target[1] -LoaderTarget $target[0]
@@ -82,75 +125,81 @@ $bep6Dll = Join-Path $projectRoot '.local\bin\BepInEx6\InteractionRange\Release\
 $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($bep5Dll).Version
 $version = '{0}.{1}.{2}' -f $assemblyVersion.Major,$assemblyVersion.Minor,$assemblyVersion.Build
 if ([Reflection.AssemblyName]::GetAssemblyName($bep6Dll).Version -ne $assemblyVersion) { throw 'BepInEx 5 and BepInEx 6 builds have different assembly versions.' }
+$bep5Facts = Assert-AssemblyFacts $bep5Dll 'BepInEx5' $version
+$bep6Facts = Assert-AssemblyFacts $bep6Dll 'BepInEx6' $version
 $checkRoot = Join-Path $projectRoot ('.local\package-checks\' + [Guid]::NewGuid().ToString('N'))
 $dist = Join-Path $projectRoot 'dist'
 New-Item -ItemType Directory -Path $checkRoot,$dist -Force | Out-Null
 
 # Explicit allowlists. Ignore rules alone are not a package policy.
-$bep5Entries = @{
-    'BepInEx/plugins/InteractionRange/InteractionRange.dll' = $bep5Dll
-    'README.md' = Join-Path $projectRoot 'README.md'
-    'CHANGELOG.md' = Join-Path $projectRoot 'CHANGELOG.md'
-    'LICENSE' = Join-Path $projectRoot 'LICENSE'
-}
-$bep6Entries = @{
-    'BepInEx/plugins/InteractionRange/InteractionRange.dll' = $bep6Dll
-    'README.md' = Join-Path $projectRoot 'README.md'
-    'CHANGELOG.md' = Join-Path $projectRoot 'CHANGELOG.md'
-    'LICENSE' = Join-Path $projectRoot 'LICENSE'
+$pluginRoot = 'BepInEx/plugins/InteractionRange'
+$packageEntries = @{
+    "$pluginRoot/InteractionRange.dll" = $bep6Dll
+    "$pluginRoot/InteractionRange.BepInEx5.dll" = $bep5Dll
+    "$pluginRoot/README.md" = Join-Path $projectRoot 'README.md'
+    "$pluginRoot/CHANGELOG.md" = Join-Path $projectRoot 'CHANGELOG.md'
+    "$pluginRoot/LICENSE" = Join-Path $projectRoot 'LICENSE'
 }
 $sourceFiles = @('.gitignore','.gitattributes','README.md','BUILDING.md','CHANGELOG.md','LICENSE',
     'Directory.Build.props','InteractionRange.csproj','InteractionRange.Tests.csproj','nuget.config',
     'scripts/Build.ps1','scripts/Test.ps1','scripts/Package.ps1')
 $sourceFiles += @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src'),(Join-Path $projectRoot 'tests') -Recurse -File -Filter '*.cs' |
     ForEach-Object { Get-RelativePath $projectRoot $_.FullName })
-$sourceEntries = @{}
-foreach ($relative in $sourceFiles) { $sourceEntries[$relative] = Join-Path $projectRoot $relative }
 if (@($sourceFiles | Where-Object { $_ -like '.local/*' }).Count -ne 0) { throw 'Source allowlist includes .local content.' }
 
-$bep5Zip = Join-Path $dist "InteractionRange-$version-BepInEx5.zip"
-$bep6Zip = Join-Path $dist "InteractionRange-$version-BepInEx6.zip"
-$sourceZip = Join-Path $dist "InteractionRange-$version-source.zip"
-Write-Zip $bep5Zip $bep5Entries
-Write-Zip $bep6Zip $bep6Entries
-Write-Zip $sourceZip $sourceEntries
-
-$expectedBep5Files = Get-SortedNames @($bep5Entries.Keys)
-$expectedBep6Files = Get-SortedNames @($bep6Entries.Keys)
+$expectedPackageFiles = Get-SortedNames @($packageEntries.Keys)
+if ($expectedPackageFiles.Count -ne 5) { throw 'Universal package allowlist must contain exactly five files.' }
 $expectedSourceFiles = Get-SortedNames $sourceFiles
-foreach ($check in @(@($bep5Zip,$expectedBep5Files), @($bep6Zip,$expectedBep6Files), @($sourceZip,$expectedSourceFiles))) {
-    $names = Get-ZipEntryNames $check[0]
-    if (@($names | Where-Object { $_.Contains('\') }).Count -ne 0) { throw "$($check[0]) has backslash entry names." }
-    if (($names -join "`n") -cne ($check[1] -join "`n")) { throw "$($check[0]) entries differ from the explicit allowlist or order." }
+$candidateZip = Join-Path $checkRoot "InteractionRange-$version.zip"
+$finalZip = Join-Path $dist "InteractionRange-$version.zip"
+$otherCurrentPackages = @(Get-ChildItem -LiteralPath $dist -File -Filter "InteractionRange-$version*.zip" |
+    Where-Object { $_.FullName -ne $finalZip })
+if ($otherCurrentPackages.Count -ne 0) {
+    throw "dist contains other $version packages. Preserve or relocate them before creating the single universal candidate: $($otherCurrentPackages.Name -join ', ')"
+}
+Write-Zip $candidateZip $packageEntries
+$names = Get-ZipEntryNames $candidateZip
+if (@($names | Where-Object { $_.Contains('\') }).Count -ne 0) { throw "$candidateZip has backslash entry names." }
+if (($names -join "`n") -cne ($expectedPackageFiles -join "`n")) { throw "$candidateZip entries differ from the explicit allowlist or order." }
+
+$packageExtract = Join-Path $checkRoot 'package-extracted'
+$sourceStage = Join-Path $checkRoot 'source-stage'
+[IO.Compression.ZipFile]::ExtractToDirectory($candidateZip, $packageExtract)
+New-Item -ItemType Directory -Path $sourceStage -Force | Out-Null
+foreach ($relative in $sourceFiles) {
+    $destination = Join-Path $sourceStage $relative
+    New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($destination)) -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $projectRoot $relative) -Destination $destination
 }
 
-$bep5Extract = Join-Path $checkRoot 'bepinex5-extracted'
-$bep6Extract = Join-Path $checkRoot 'bepinex6-extracted'
-$sourceExtract = Join-Path $checkRoot 'source-extracted'
-[IO.Compression.ZipFile]::ExtractToDirectory($bep5Zip, $bep5Extract)
-[IO.Compression.ZipFile]::ExtractToDirectory($bep6Zip, $bep6Extract)
-[IO.Compression.ZipFile]::ExtractToDirectory($sourceZip, $sourceExtract)
-foreach ($check in @(@($bep5Extract,$expectedBep5Files), @($bep6Extract,$expectedBep6Files))) {
-    $actualPluginFiles = Get-SortedNames @(Get-ChildItem -LiteralPath $check[0] -Recurse -File -Force | ForEach-Object { Get-RelativePath $check[0] $_.FullName })
-    if (($actualPluginFiles -join "`n") -cne ($check[1] -join "`n")) { throw "$($check[0]) differs from its explicit file allowlist." }
-    $packagedDlls = @(Get-ChildItem -LiteralPath $check[0] -Recurse -File -Filter '*.dll')
-    if ($packagedDlls.Count -ne 1 -or $packagedDlls[0].Name -ne 'InteractionRange.dll') { throw "$($check[0]) must contain exactly the InteractionRange DLL." }
+$actualPackageFiles = Get-SortedNames @(Get-ChildItem -LiteralPath $packageExtract -Recurse -File -Force |
+    ForEach-Object { Get-RelativePath $packageExtract $_.FullName })
+if (($actualPackageFiles -join "`n") -cne ($expectedPackageFiles -join "`n")) { throw 'Extracted universal package differs from its explicit five-file allowlist.' }
+$actualSourceFiles = Get-SortedNames @(Get-ChildItem -LiteralPath $sourceStage -Recurse -File -Force |
+    ForEach-Object { Get-RelativePath $sourceStage $_.FullName })
+if (($actualSourceFiles -join "`n") -cne ($expectedSourceFiles -join "`n")) { throw 'Internal source stage differs from its explicit file allowlist.' }
+$packagedDlls = @(Get-ChildItem -LiteralPath $packageExtract -Recurse -File -Filter '*.dll')
+if ($packagedDlls.Count -ne 2 -or
+    @($packagedDlls | Where-Object Name -eq 'InteractionRange.dll').Count -ne 1 -or
+    @($packagedDlls | Where-Object Name -eq 'InteractionRange.BepInEx5.dll').Count -ne 1) {
+    throw 'Universal package must contain exactly the named BepInEx 6 and BepInEx 5 DLLs.'
 }
-$actualSourceFiles = Get-SortedNames @(Get-ChildItem -LiteralPath $sourceExtract -Recurse -File -Force | ForEach-Object { Get-RelativePath $sourceExtract $_.FullName })
-if (($actualSourceFiles -join "`n") -cne ($expectedSourceFiles -join "`n")) { throw 'Source ZIP differs from its explicit file allowlist.' }
-foreach ($check in @(@($bep5Dll,$bep5Extract), @($bep6Dll,$bep6Extract))) {
-    $extractedDll = Join-Path $check[1] 'BepInEx\plugins\InteractionRange\InteractionRange.dll'
-    if ((Get-FileHash -LiteralPath $check[0]).Hash -ne (Get-FileHash -LiteralPath $extractedDll).Hash) {
-        throw "$($check[1]) plugin differs from its verified build."
+$packagedBep6Dll = Join-Path $packageExtract "$pluginRoot/InteractionRange.dll"
+$packagedBep5Dll = Join-Path $packageExtract "$pluginRoot/InteractionRange.BepInEx5.dll"
+foreach ($check in @(@($bep5Dll,$packagedBep5Dll), @($bep6Dll,$packagedBep6Dll))) {
+    if ((Get-FileHash -LiteralPath $check[0]).Hash -ne (Get-FileHash -LiteralPath $check[1]).Hash) {
+        throw "$($check[1]) differs from its verified build."
     }
 }
+$null = Assert-AssemblyFacts $packagedBep5Dll 'BepInEx5' $version
+$null = Assert-AssemblyFacts $packagedBep6Dll 'BepInEx6' $version
 
 # Personal-path scan: top-level folders of this checkout and its references, plus the account name.
 $markers = @(@($projectRoot,$gamePath,$bep5CorePath,$bep6CorePath) | ForEach-Object { Get-TopFolder $_ }) + @($env:USERNAME) |
     Where-Object { $_ -and $_.Length -ge 3 } | Sort-Object -Unique
 $markers = @($markers) + @($markers | ForEach-Object { $_.Replace('\','/') }) | Sort-Object -Unique
 $latin1 = [Text.Encoding]::GetEncoding(28591)
-foreach ($file in @(Get-ChildItem -LiteralPath $bep5Extract,$bep6Extract,$sourceExtract -Recurse -File -Force)) {
+foreach ($file in @(Get-ChildItem -LiteralPath $packageExtract -Recurse -File -Force)) {
     $bytes = [IO.File]::ReadAllBytes($file.FullName)
     foreach ($text in @($latin1.GetString($bytes), [Text.Encoding]::Unicode.GetString($bytes))) {
         foreach ($marker in $markers) {
@@ -159,37 +208,47 @@ foreach ($file in @(Get-ChildItem -LiteralPath $bep5Extract,$bep6Extract,$source
     }
 }
 
-foreach ($target in @(@('BepInEx5',$bep5CorePath,$bep5Dll), @('BepInEx6',$bep6CorePath,$bep6Dll))) {
-    & (Join-Path $sourceExtract 'scripts\Build.ps1') -GamePath $gamePath -BepInExCorePath $target[1] -LoaderTarget $target[0]
-    & (Join-Path $sourceExtract 'scripts\Test.ps1') -GamePath $gamePath -BepInExCorePath $target[1] -LoaderTarget $target[0]
-    $rebuiltDll = Join-Path $sourceExtract ".local\bin\$($target[0])\InteractionRange\Release\InteractionRange.dll"
-    if ((Get-FileHash -LiteralPath $target[2]).Hash -ne (Get-FileHash -LiteralPath $rebuiltDll).Hash) {
-        throw "Fresh source rebuild for $($target[0]) differs from the candidate DLL."
+$oldPackagePath = $env:INTERACTION_RANGE_PACKAGE_PLUGIN_PATH
+try {
+    $env:INTERACTION_RANGE_PACKAGE_PLUGIN_PATH = Join-Path $packageExtract $pluginRoot
+    foreach ($target in @(@('BepInEx5',$bep5CorePath,$bep5Dll), @('BepInEx6',$bep6CorePath,$bep6Dll))) {
+        & (Join-Path $sourceStage 'scripts\Build.ps1') -GamePath $gamePath -BepInExCorePath $target[1] -LoaderTarget $target[0]
+        & (Join-Path $sourceStage 'scripts\Test.ps1') -GamePath $gamePath -BepInExCorePath $target[1] -LoaderTarget $target[0]
+        $rebuiltDll = Join-Path $sourceStage ".local\bin\$($target[0])\InteractionRange\Release\InteractionRange.dll"
+        if ((Get-FileHash -LiteralPath $target[2]).Hash -ne (Get-FileHash -LiteralPath $rebuiltDll).Hash) {
+            throw "Fresh source rebuild for $($target[0]) differs from the candidate DLL."
+        }
     }
 }
+finally {
+    if ($null -eq $oldPackagePath) { Remove-Item Env:INTERACTION_RANGE_PACKAGE_PLUGIN_PATH -ErrorAction SilentlyContinue }
+    else { $env:INTERACTION_RANGE_PACKAGE_PLUGIN_PATH = $oldPackagePath }
+}
+
+Copy-Item -LiteralPath $candidateZip -Destination $finalZip -Force
 $record = [ordered]@{
     checkedAt = [DateTime]::UtcNow.ToString('o')
-    bepInEx5Zip = $bep5Zip
-    bepInEx6Zip = $bep6Zip
-    sourceZip = $sourceZip
-    bepInEx5ZipSha256 = (Get-FileHash -LiteralPath $bep5Zip).Hash
-    bepInEx6ZipSha256 = (Get-FileHash -LiteralPath $bep6Zip).Hash
-    sourceZipSha256 = (Get-FileHash -LiteralPath $sourceZip).Hash
+    universalZip = $finalZip
+    universalZipSha256 = (Get-FileHash -LiteralPath $finalZip).Hash
     bepInEx5DllSha256 = (Get-FileHash -LiteralPath $bep5Dll).Hash
     bepInEx6DllSha256 = (Get-FileHash -LiteralPath $bep6Dll).Hash
-    bepInEx5Files = $expectedBep5Files
-    bepInEx6Files = $expectedBep6Files
-    sourceFiles = $expectedSourceFiles
+    bepInEx5Assembly = $bep5Facts
+    bepInEx6Assembly = $bep6Facts
+    packageFiles = $expectedPackageFiles
+    sourceStageFiles = $expectedSourceFiles
+    loaderDiscoveryPluginsPerTarget = 1
+    warmCacheUpgradePassed = $true
     personalPathMarkersChecked = @($markers).Count
     personalPathScanClean = $true
     freshSourceRebuildIdentical = $true
     gameInstallationChanged = $false
     liveGameplayTest = $false
-    bepInEx6RuntimeEvidence = 'Historical startup on BepInEx 6.0.0-be.755 only. No new live test by user decision.'
+    runtimeEvidence = 'No new live test. Package discovery and cache upgrade checks ran outside Unity with the pinned loader assemblies.'
 }
 $record | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $checkRoot 'validation.json') -Encoding utf8
 Write-Output "Personal path scan clean ($(@($markers).Count) markers)."
-Write-Output "Candidate packages validated: $bep5Zip, $bep6Zip and $sourceZip"
+Write-Output "Universal candidate validated: $finalZip"
+Write-Output "Universal ZIP SHA256: $($record.universalZipSha256)"
 Write-Output "BepInEx 5 DLL SHA256: $($record.bepInEx5DllSha256)"
 Write-Output "BepInEx 6 DLL SHA256: $($record.bepInEx6DllSha256)"
 Write-Output "Validation record: $(Join-Path $checkRoot 'validation.json')"

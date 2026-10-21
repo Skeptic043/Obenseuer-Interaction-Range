@@ -7,8 +7,8 @@ Reach a little farther. Pick up items, open doors and containers, and talk to pe
 ### Manual installation
 
 1. Install either [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5) (`BepInEx_win_x64_5.4.23.5.zip`) or [BepInEx 6.0.0-be.755 Unity Mono](https://builds.bepinex.dev/projects/bepinex_be/755/BepInEx-Unity.Mono-win-x64-6.0.0-be.755%2B3fab71a.zip) in your Obenseuer game folder, following its installation instructions.
-2. Download the Interaction Range ZIP that matches your installed loader. BepInEx 5 and BepInEx 6 use different plugin DLLs, so do not interchange the two files.
-3. Extract the ZIP and copy its `BepInEx/plugins/InteractionRange` folder into `BepInEx/plugins` in your Obenseuer folder.
+2. Download the Interaction Range ZIP.
+3. Extract the ZIP into your Obenseuer folder. The package includes separate BepInEx 5 and BepInEx 6 DLLs in `BepInEx/plugins/InteractionRange`, and your loader selects the matching one.
 4. Launch Obenseuer normally.
 
 ## How it works
@@ -27,7 +27,7 @@ After the first launch, edit `BepInEx/config/com.skeptic043.obenseuer.interactio
 
 No known incompatibilities.
 
-Separate builds are provided for BepInEx 5.4.23.5 and BepInEx 6.0.0-be.755 Unity Mono on Windows x64. The 1.0.1 BepInEx 6 package passed the same offline behavior and game-assembly checks as the BepInEx 5 package, but it has not received a new in-game test.
+One package supports BepInEx 5.4.23.5 and BepInEx 6.0.0-be.755 Unity Mono on Windows x64. Version 1.0.2 passed offline behavior, game-assembly, package-layout, and loader-discovery checks for both targets, but the universal package has not received fresh in-game upgrade testing on either loader.
 
 ## AI Use
 

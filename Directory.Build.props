@@ -34,6 +34,7 @@
     <Reference Include="0Harmony"><HintPath>$(BepInExCorePath)\0Harmony.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="Mono.Cecil"><HintPath>$(BepInExCorePath)\Mono.Cecil.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Assembly-CSharp"><HintPath>$(GameManagedPath)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine"><HintPath>$(GameManagedPath)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManagedPath)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
@@ -45,6 +46,7 @@
     <Error Condition="'$(GamePath)' != '' And !Exists('$(GameManagedPath)\Assembly-CSharp.dll')" Text="GamePath must point to an Obenseuer installation (Obenseuer_Data\Managed\Assembly-CSharp.dll not found). Pass -GamePath to the scripts or -p:GamePath=... to dotnet, or set it in .local/LocalPaths.props." />
     <Error Condition="'$(LoaderTarget)' == 'BepInEx5' And (!Exists('$(BepInExCorePath)\BepInEx.dll') Or !Exists('$(BepInExCorePath)\0Harmony.dll'))" Text="BepInExCorePath must contain BepInEx 5.4.23.5 core assemblies." />
     <Error Condition="'$(LoaderTarget)' == 'BepInEx6' And (!Exists('$(BepInExCorePath)\BepInEx.Core.dll') Or !Exists('$(BepInExCorePath)\BepInEx.Unity.Mono.dll') Or !Exists('$(BepInExCorePath)\0Harmony.dll'))" Text="BepInExCorePath must contain BepInEx 6.0.0-be.755 Unity Mono core assemblies." />
+    <Error Condition="!Exists('$(BepInExCorePath)\Mono.Cecil.dll')" Text="BepInExCorePath must contain the loader's Mono.Cecil.dll for package discovery tests." />
     <ItemGroup Condition="'$(LoaderTarget)' == 'BepInEx5'">
       <_PinnedLoaderReference Include="$(BepInExCorePath)\BepInEx.dll"><ExpectedHash>8255B28902886085C578B9E427D3073C97002DB85176D2090CDEDA90EF14CE70</ExpectedHash></_PinnedLoaderReference>
       <_PinnedLoaderReference Include="$(BepInExCorePath)\0Harmony.dll"><ExpectedHash>1A21CC03424FC82C3DD1346905D16494536B9595AE4162228D99FB7C285C1031</ExpectedHash></_PinnedLoaderReference>

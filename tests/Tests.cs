@@ -6,9 +6,12 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
+using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using HarmonyLib;
 using InteractionRange;
+using Mono.Cecil;
 using UnityEngine;
 
 internal static class Tests
@@ -64,8 +67,9 @@ internal static class Tests
             True(typeof(Plugin).BaseType == typeof(BepInEx.BaseUnityPlugin));
 #endif
             True(Plugin.Guid == "com.skeptic043.obenseuer.interactionrange");
-            True(Plugin.Version == "1.0.1");
+            True(Plugin.Version == "1.0.2");
         });
+        PackageDiscoveryTests();
         Check("no compile-time game references; game members are resolved by name", () =>
             True(!typeof(Plugin).Assembly.GetReferencedAssemblies().Any(reference => reference.Name == "Assembly-CSharp")));
         Check("six stops and native preservation", () =>
@@ -100,6 +104,146 @@ internal static class Tests
         BuildingSystemMenu.instance = null;
         Console.WriteLine($"PASS: {passed} checks. Actual game IL inspected and real game methods patched; Harmony wrappers executed on desktop .NET Framework. No Unity native runtime or gameplay executed.");
         return 0;
+    }
+
+    private static void PackageDiscoveryTests()
+    {
+        string packageDirectory = Environment.GetEnvironmentVariable("INTERACTION_RANGE_PACKAGE_PLUGIN_PATH");
+        if (string.IsNullOrEmpty(packageDirectory)) return;
+        packageDirectory = Path.GetFullPath(packageDirectory);
+        InitializeLoaderPaths();
+        Check("packaged folder is discovered as exactly one matching-loader plugin", () =>
+        {
+            var found = Discover(packageDirectory, null);
+            Equal(1, found.Count);
+#if BEPINEX6
+            True(Path.GetFileName(found[0].Path) == "InteractionRange.dll");
+#else
+            True(Path.GetFileName(found[0].Path) == "InteractionRange.BepInEx5.dll");
+#endif
+            AssertPackageMetadata(found[0]);
+        });
+        Check("loader cache refreshes when the universal package replaces the old layout", () =>
+        {
+            string warm = Path.Combine(working, "warm-cache");
+            Directory.CreateDirectory(warm);
+            string legacyPath = Path.Combine(warm, "InteractionRange.dll");
+            string bep5Path = Path.Combine(packageDirectory, "InteractionRange.BepInEx5.dll");
+            string bep6Path = Path.Combine(packageDirectory, "InteractionRange.dll");
+            DateTime oldTimestamp = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            File.Copy(bep5Path, legacyPath);
+            File.SetLastWriteTimeUtc(legacyPath, oldTimestamp);
+
+            const string cacheName = "interaction-range-package-test.cache";
+            var before = Discover(warm, cacheName);
+#if BEPINEX6
+            Equal(0, before.Count);
+#else
+            Equal(1, before.Count);
+            True(Path.GetFileName(before[0].Path) == "InteractionRange.dll");
+#endif
+
+            File.Copy(bep6Path, legacyPath, true);
+            File.SetLastWriteTimeUtc(legacyPath, oldTimestamp.AddSeconds(4));
+            string renamedBep5 = Path.Combine(warm, "InteractionRange.BepInEx5.dll");
+            File.Copy(bep5Path, renamedBep5);
+            File.SetLastWriteTimeUtc(renamedBep5, oldTimestamp.AddSeconds(4));
+            var after = Discover(warm, cacheName);
+            Equal(1, after.Count);
+#if BEPINEX6
+            True(Path.GetFileName(after[0].Path) == "InteractionRange.dll");
+#else
+            True(Path.GetFileName(after[0].Path) == "InteractionRange.BepInEx5.dll");
+#endif
+            AssertPackageMetadata(after[0]);
+        });
+    }
+
+    private static List<DiscoveredPlugin> Discover(string directory, string cacheName)
+    {
+#if BEPINEX6
+        var assemblies = TypeLoader.FindPluginTypes<DiscoveryRecord>(directory,
+            (type, path) => ReadPlugin(type),
+            assembly => assembly.MainModule.AssemblyReferences.Any(reference => reference.Name == "BepInEx.Core"),
+            cacheName);
+#else
+        var assemblies = TypeLoader.FindPluginTypes<DiscoveryRecord>(directory,
+            ReadPlugin,
+            assembly => assembly.MainModule.AssemblyReferences.Any(reference => reference.Name == "BepInEx"),
+            cacheName);
+#endif
+        return assemblies.SelectMany(pair => pair.Value.Select(plugin => new DiscoveredPlugin
+        {
+            Path = pair.Key,
+            Guid = plugin.Guid,
+            Name = plugin.Name,
+            Version = plugin.Version,
+        })).ToList();
+    }
+
+    private static DiscoveryRecord ReadPlugin(TypeDefinition type)
+    {
+        var attribute = type.CustomAttributes.SingleOrDefault(item => item.AttributeType.FullName == typeof(BepInPlugin).FullName);
+        if (attribute == null) return null;
+        return new DiscoveryRecord
+        {
+            Guid = (string)attribute.ConstructorArguments[0].Value,
+            Name = (string)attribute.ConstructorArguments[1].Value,
+            Version = (string)attribute.ConstructorArguments[2].Value,
+        };
+    }
+
+    private static void AssertPackageMetadata(DiscoveredPlugin plugin)
+    {
+        True(plugin.Guid == Plugin.Guid);
+        True(plugin.Name == Plugin.Name);
+        True(plugin.Version == Plugin.Version);
+    }
+
+    private static void InitializeLoaderPaths()
+    {
+        string root = Path.Combine(working, "BepInEx");
+        string executable = Path.Combine(working, "Obenseuer.exe");
+        string managed = Path.Combine(working, "Obenseuer_Data", "Managed");
+        Directory.CreateDirectory(Path.Combine(root, "cache"));
+        Directory.CreateDirectory(managed);
+        File.WriteAllBytes(executable, new byte[0]);
+        var setExecutablePath = typeof(Paths).GetMethod("SetExecutablePath", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        True(setExecutablePath != null);
+#if BEPINEX6
+        setExecutablePath.Invoke(null, new object[] { executable, root, managed, false, new string[0] });
+#else
+        setExecutablePath.Invoke(null, new object[] { executable, root, managed, new string[0] });
+#endif
+    }
+
+    private sealed class DiscoveredPlugin
+    {
+        internal string Path;
+        internal string Guid;
+        internal string Name;
+        internal string Version;
+    }
+
+    private sealed class DiscoveryRecord : ICacheable
+    {
+        public string Guid;
+        public string Name;
+        public string Version;
+
+        public void Save(BinaryWriter writer)
+        {
+            writer.Write(Guid);
+            writer.Write(Name);
+            writer.Write(Version);
+        }
+
+        public void Load(BinaryReader reader)
+        {
+            Guid = reader.ReadString();
+            Name = reader.ReadString();
+            Version = reader.ReadString();
+        }
     }
 
     private static void ConfigTests()
