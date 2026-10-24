@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 1.0.3
+
+### Fixed
+- Fixed extended reach not working after the Obenseuer 0.5.13 update.
+
 ## Version 1.0.2
 
 ### Changed

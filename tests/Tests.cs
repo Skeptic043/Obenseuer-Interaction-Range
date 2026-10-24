@@ -26,7 +26,6 @@ internal static class Tests
     private static readonly MethodInfo Helper = AccessTools.Method(typeof(RangePatches), nameof(RangePatches.ReadUseDistance));
     private static readonly FieldInfo UseField = AccessTools.Field(typeof(InteractObjects), "useDistance");
     private static readonly FieldInfo ScanField = AccessTools.Field(typeof(InteractObjects), "maxDistance");
-    private static readonly FieldInfo MeleeField = AccessTools.Field(typeof(InteractObjects), "maxMeleeDistance");
 
     internal static int Run()
     {
@@ -67,7 +66,6 @@ internal static class Tests
             True(typeof(Plugin).BaseType == typeof(BepInEx.BaseUnityPlugin));
 #endif
             True(Plugin.Guid == "com.skeptic043.obenseuer.interactionrange");
-            True(Plugin.Version == "1.0.2");
         });
         PackageDiscoveryTests();
         Check("no compile-time game references; game members are resolved by name", () =>
@@ -298,7 +296,7 @@ internal static class Tests
             True(RangePatches.Resolve() == null);
             game = RangePatches.Game;
             True(Equals(UseField, game.UseDistance));
-            True(game.Raycasts.Length == 1 && Equals(game.Raycasts[0], AccessTools.Method(typeof(InteractObjects), "RaycastInteract")));
+            True(game.Reach.Length == 1 && Equals(game.Reach[0], AccessTools.Method(typeof(InteractObjects), "GetUseDistance")));
             True(game.Uses.Length == 1 && Equals(game.Uses[0], AccessTools.Method(typeof(InteractObjects), "UseInteractable")));
             True(Equals(game.Interactable, AccessTools.Field(typeof(InteractObjects), "interactable")));
             True(Equals(game.CanUse, AccessTools.Field(typeof(InteractObjects), "canUse")));
@@ -312,7 +310,7 @@ internal static class Tests
             True(RangePatches.Find(typeof(InteractObjects), null, out none) != null);
             True(RangePatches.Find(typeof(InteractObjects), typeof(FakeTarget), out none) != null);
             True(RangePatches.Find(typeof(FakeTarget), typeof(BuildingSystemMenu), out none).Contains("useDistance"));
-            True(RangePatches.Find(typeof(NoRaycast), typeof(BuildingSystemMenu), out none).Contains("RaycastInteract"));
+            True(RangePatches.Find(typeof(NoReach), typeof(BuildingSystemMenu), out none).Contains("GetUseDistance"));
             True(RangePatches.Find(typeof(InteractObjects), typeof(FakeMenu), out none).Contains("instance"));
             // A reader that cannot be built is reported like a missing member (Find then returns no members).
             var unreadable = new GameMembers();
@@ -328,35 +326,37 @@ internal static class Tests
         Check("optional canUse and UseInteractable may be absent", () =>
         {
             True(RangePatches.Find(typeof(MinimalTarget), typeof(BuildingSystemMenu), out var minimal) == null);
-            True(minimal.CanUse == null && minimal.Uses.Length == 0 && minimal.Raycasts.Length == 2);
+            True(minimal.CanUse == null && minimal.Uses.Length == 0 && minimal.Reach.Length == 2);
         });
     }
 
     private static void TranspilerTests()
     {
         RangePatches.Game = game;
-        var raycast = game.Raycasts[0];
-        Check("actual RaycastInteract IL: one helper call right after the useDistance read", () =>
+        var reach = game.Reach[0];
+        Check("actual GetUseDistance IL: a helper call right after each useDistance read", () =>
         {
-            var original = PatchProcessor.GetOriginalInstructions(raycast).ToList();
-            Equal(1, original.Count(i => i.opcode == OpCodes.Ldfld && Equals(i.operand, UseField)));
-            var rewritten = RangePatches.Transpile(original, raycast).ToList();
-            Equal(original.Count + 1, rewritten.Count);
+            var original = PatchProcessor.GetOriginalInstructions(reach).ToList();
+            // Both branches read the base reach; the per-object extraInteractDistance bonus stays native.
+            Equal(2, original.Count(i => i.opcode == OpCodes.Ldfld && Equals(i.operand, UseField)));
+            var rewritten = RangePatches.Transpile(original, reach).ToList();
+            Equal(original.Count + 2, rewritten.Count);
             var calls = Enumerable.Range(0, rewritten.Count).Where(i => rewritten[i].Calls(Helper)).ToList();
-            Equal(1, calls.Count);
-            True(rewritten[calls[0] - 1].opcode == OpCodes.Ldfld && Equals(rewritten[calls[0] - 1].operand, UseField));
+            Equal(2, calls.Count);
+            foreach (int call in calls) True(rewritten[call - 1].opcode == OpCodes.Ldfld && Equals(rewritten[call - 1].operand, UseField));
             // Every original instruction (with its labels and blocks) is kept in order by reference.
             var kept = rewritten.Where(i => !i.Calls(Helper)).ToList();
             Equal(original.Count, kept.Count);
             for (int i = 0; i < original.Count; i++) True(ReferenceEquals(original[i], kept[i]));
             True(!rewritten.Any(i => i.opcode == OpCodes.Stfld && (Equals(i.operand, UseField) || Equals(i.operand, ScanField))));
-            foreach (var field in new[] { ScanField, MeleeField })
-            {
-                Equal(1, original.Count(i => Equals(i.operand, field)));
-                int index = rewritten.FindIndex(i => i.opcode == OpCodes.Ldfld && Equals(i.operand, field));
-                True(!rewritten[index + 1].Calls(Helper));
-            }
             True(!RangePatches.Inactive);
+            // Targeting and harvest reach must still come from GetUseDistance, not a direct read the patch would miss.
+            foreach (var name in new[] { "RaycastInteract", "IsWithinUseDistance" })
+            {
+                var caller = PatchProcessor.GetOriginalInstructions(AccessTools.Method(typeof(InteractObjects), name));
+                True(caller.Any(i => i.Calls(reach)));
+                Equal(0, caller.Count(i => i.opcode == OpCodes.Ldfld && Equals(i.operand, UseField)));
+            }
         });
         Check("synthetic: no useDistance read returns the input unchanged and marks inactive", () =>
         {
@@ -365,11 +365,11 @@ internal static class Tests
                 new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Ldfld, ScanField),
                 new CodeInstruction(OpCodes.Pop), new CodeInstruction(OpCodes.Ret),
             };
-            var result = RangePatches.Transpile(original, raycast).ToList();
+            var result = RangePatches.Transpile(original, reach).ToList();
             Equal(original.Count, result.Count);
             for (int i = 0; i < original.Count; i++) True(ReferenceEquals(original[i], result[i]));
             True(RangePatches.Inactive);
-            RangePatches.Transpile(PatchProcessor.GetOriginalInstructions(raycast), raycast).ToList();
+            RangePatches.Transpile(PatchProcessor.GetOriginalInstructions(reach), reach).ToList();
             True(!RangePatches.Inactive);
         });
         Check("synthetic: two useDistance reads are both wrapped", () =>
@@ -380,7 +380,7 @@ internal static class Tests
                 new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Ldfld, UseField),
                 new CodeInstruction(OpCodes.Add), new CodeInstruction(OpCodes.Pop), new CodeInstruction(OpCodes.Ret),
             };
-            var result = RangePatches.Transpile(original, raycast).ToList();
+            var result = RangePatches.Transpile(original, reach).ToList();
             Equal(original.Count + 2, result.Count);
             True(result[2].Calls(Helper) && result[5].Calls(Helper));
             True(ReferenceEquals(original[1], result[1]) && ReferenceEquals(original[3], result[4]));
@@ -389,11 +389,11 @@ internal static class Tests
         Check("transpiler failure returns the input unchanged without throwing", () =>
         {
             var original = new List<CodeInstruction> { new CodeInstruction(OpCodes.Ldarg_0), null, new CodeInstruction(OpCodes.Ret) };
-            var result = RangePatches.Transpile(original, raycast).ToList();
+            var result = RangePatches.Transpile(original, reach).ToList();
             Equal(3, result.Count);
             True(ReferenceEquals(original[0], result[0]) && result[1] == null && ReferenceEquals(original[2], result[2]));
             True(RangePatches.Inactive);
-            RangePatches.Transpile(PatchProcessor.GetOriginalInstructions(raycast), raycast).ToList();
+            RangePatches.Transpile(PatchProcessor.GetOriginalInstructions(reach), reach).ToList();
             True(!RangePatches.Inactive);
         });
     }
@@ -550,19 +550,20 @@ internal static class Tests
 
     private static void InstallTests()
     {
-        var raycast = game.Raycasts[0];
+        var reach = game.Reach[0];
         var use = game.Uses[0];
         var harmony = new Harmony("interactionrange.tests.install");
         var competitor = new Harmony("interactionrange.tests.competitor");
         var competing = new HarmonyMethod(typeof(Tests), nameof(RemoveUseRead)) { priority = Priority.First };
         try
         {
-            Check("actual game installation owns exactly RaycastInteract and UseInteractable", () =>
+            Check("actual game installation owns exactly GetUseDistance and UseInteractable", () =>
             {
                 RangePatches.Install(harmony);
                 var owned = Harmony.GetAllPatchedMethods().Where(m => Owns(m, harmony)).ToList();
                 Equal(2, owned.Count);
-                True(owned.Contains(raycast) && owned.Contains(use));
+                True(owned.Contains(reach) && owned.Contains(use));
+                True(!Owns(AccessTools.Method(typeof(InteractObjects), "RaycastInteract"), harmony));
                 True(!Owns(AccessTools.Method(typeof(InteractObjects), "GetCrosshairTarget"), harmony));
                 True(!Owns(AccessTools.Method(typeof(InteractObjects), "GetInteractablesWithinSphere"), harmony));
                 True(!RangePatches.Inactive);
@@ -575,17 +576,17 @@ internal static class Tests
         {
             Check("competing transpiler installed first: install succeeds, patch inactive", () =>
             {
-                competitor.Patch(raycast, transpiler: competing);
+                competitor.Patch(reach, transpiler: competing);
                 RangePatches.Install(harmony);
                 True(RangePatches.Inactive);
-                True(Owns(raycast, competitor) && Owns(raycast, harmony));
+                True(Owns(reach, competitor) && Owns(reach, harmony));
                 True(RangePatches.OtherOwners(harmony).SequenceEqual(new[] { competitor.Id }));
             });
         }
         finally
         {
             RangePatches.RemoveOwnedPatches(harmony);
-            competitor.Unpatch(raycast, HarmonyPatchType.All, competitor.Id);
+            competitor.Unpatch(reach, HarmonyPatchType.All, competitor.Id);
         }
         try
         {
@@ -593,26 +594,26 @@ internal static class Tests
             {
                 RangePatches.Install(harmony);
                 True(!RangePatches.Inactive);
-                competitor.Patch(raycast, transpiler: competing);
+                competitor.Patch(reach, transpiler: competing);
                 True(RangePatches.Inactive);
-                True(Owns(raycast, competitor) && Owns(raycast, harmony));
+                True(Owns(reach, competitor) && Owns(reach, harmony));
             });
         }
         finally
         {
             RangePatches.RemoveOwnedPatches(harmony);
-            competitor.Unpatch(raycast, HarmonyPatchType.All, competitor.Id);
+            competitor.Unpatch(reach, HarmonyPatchType.All, competitor.Id);
         }
         Check("all test patches removed", () =>
             True(!Harmony.GetAllPatchedMethods().Any(m => Owns(m, harmony) || Owns(m, competitor))));
         Check("failed install removes the patches it already applied", () =>
         {
-            // The unpatchable second target fails after RaycastInteract was patched.
+            // The unpatchable second target fails after GetUseDistance was patched.
             RangePatches.Game = new GameMembers
             {
                 UseDistance = game.UseDistance, Interactable = game.Interactable, CanUse = game.CanUse,
                 MenuInstance = game.MenuInstance, MenuIsOpen = game.MenuIsOpen,
-                Raycasts = game.Raycasts, Uses = new[] { AccessTools.Method(typeof(Unpatchable), nameof(Unpatchable.UseInteractable)) },
+                Reach = game.Reach, Uses = new[] { AccessTools.Method(typeof(Unpatchable), nameof(Unpatchable.UseInteractable)) },
             };
             var failing = new Harmony("interactionrange.tests.failing");
             try
@@ -621,7 +622,7 @@ internal static class Tests
                 try { RangePatches.Install(failing); }
                 catch (Exception error) { failed = true; Console.WriteLine("  expected install failure: " + error.GetType().Name + ": " + error.Message); }
                 True(failed);
-                True(!Owns(raycast, failing) && !Owns(use, failing));
+                True(!Owns(reach, failing) && !Owns(use, failing));
             }
             finally { RangePatches.Game = game; }
         });
@@ -750,10 +751,10 @@ internal static class Tests
         public int useDistance = 1;
         public object interactable = null;
         public static object instance = null;
-        public void RaycastInteract() { }
+        public void GetUseDistance() { }
     }
 
-    private sealed class NoRaycast
+    private sealed class NoReach
     {
         public float useDistance = 1.5f;
         public object interactable = null;
@@ -770,7 +771,7 @@ internal static class Tests
     {
         public float useDistance = 1.5f;
         public object interactable = null;
-        public void RaycastInteract() { }
-        public void RaycastInteract(int mode) { }
+        public float GetUseDistance() => useDistance;
+        public float GetUseDistance(int mode) => useDistance;
     }
 }

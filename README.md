@@ -12,7 +12,7 @@ Reach a little farther. Pick up items, open doors and containers, and talk to pe
 
 ## How it works
 
-Interaction Range extends how far away you can use things you're looking at. Pickups, doors, containers, conversations, and tap or hold actions all use the extended reach. Objects still need to be in plain view, and locks, ownership, theft and inventory limits work as normal. Building, cleaning and removal modes keep their normal range, and this mod leaves melee range and item placement unchanged.
+Interaction Range extends how far away you can use things you're looking at. Pickups, doors, containers, conversations, quick planting and harvesting, and tap or hold actions all use the extended reach. Objects still need to be in plain view, and locks, ownership, theft and inventory limits work as normal. Building, cleaning and removal modes keep their normal range, and this mod leaves melee range and item placement unchanged.
 
 ## Configuration
 

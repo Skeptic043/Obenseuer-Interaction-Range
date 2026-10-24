@@ -11,11 +11,11 @@ namespace InteractionRange
     internal sealed class GameMembers
     {
         internal FieldInfo UseDistance, Interactable, CanUse, MenuInstance, MenuIsOpen;
-        internal MethodInfo[] Raycasts, Uses;
+        internal MethodInfo[] Reach, Uses;
         // Built once from MenuInstance/MenuIsOpen so the per-frame menu check neither reflects nor boxes.
         internal AccessTools.FieldRef<UnityEngine.Object> Menu;
         internal AccessTools.FieldRef<UnityEngine.Object, bool> MenuOpen;
-        internal IEnumerable<MethodInfo> Targets => Raycasts.Concat(Uses);
+        internal IEnumerable<MethodInfo> Targets => Reach.Concat(Uses);
     }
 
     internal static class RangePatches
@@ -59,14 +59,15 @@ namespace InteractionRange
                 CanUse = Field(target, "canUse"),
                 MenuInstance = Field(menu, "instance"),
                 MenuIsOpen = Field(menu, "menuIsOpen"),
-                Raycasts = Methods(target, "RaycastInteract").ToArray(),
+                // GetUseDistance feeds first-person targeting (RaycastInteract, which also gates quick planting) and plant harvest reach (IsWithinUseDistance).
+                Reach = Methods(target, "GetUseDistance").ToArray(),
                 Uses = Methods(target, "UseInteractable").Where(m => !m.IsStatic).ToArray(),
             };
             string problem = CheckField(members.UseDistance, "InteractObjects.useDistance", typeof(float), false)
                 ?? CheckField(members.Interactable, "InteractObjects.interactable", null, false)
                 ?? CheckField(members.MenuInstance, "BuildingSystemMenu.instance", menu, true)
                 ?? CheckField(members.MenuIsOpen, "BuildingSystemMenu.menuIsOpen", typeof(bool), false)
-                ?? CheckMethods(members.Raycasts, "InteractObjects.RaycastInteract")
+                ?? CheckMethods(members.Reach, "InteractObjects.GetUseDistance")
                 ?? BuildMenuReaders(members);
             if (problem != null) return problem;
             if (CheckField(members.CanUse, "InteractObjects.canUse", typeof(bool), false) != null) members.CanUse = null;
@@ -124,7 +125,7 @@ namespace InteractionRange
             }
         }
 
-        // UseInteractable can run before the next RaycastInteract after the menu opens or the setting drops.
+        // UseInteractable can run before the next targeting update after the menu opens or the setting drops.
         internal static void BeforeUse(object __instance)
         {
             try
@@ -149,7 +150,7 @@ namespace InteractionRange
             catch { }
         }
 
-        // Runs again whenever any mod patches RaycastInteract, so it must never throw.
+        // Runs again whenever any mod patches GetUseDistance, so it must never throw.
         internal static IEnumerable<CodeInstruction> Transpile(IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod)
         {
             var original = new List<CodeInstruction>(instructions);
@@ -162,12 +163,12 @@ namespace InteractionRange
                     return result;
                 }
                 if (unchanged.Add(__originalMethod))
-                    Log?.LogWarning("RaycastInteract no longer reads useDistance (game update or another mod changed it); normal reach stays vanilla.");
+                    Log?.LogWarning("GetUseDistance no longer reads useDistance (game update or another mod changed it); normal reach stays vanilla.");
             }
             catch (Exception error)
             {
                 unchanged.Add(__originalMethod);
-                Log?.LogError("Could not rewrite RaycastInteract; normal reach stays vanilla. " + error);
+                Log?.LogError("Could not rewrite GetUseDistance; normal reach stays vanilla. " + error);
             }
             return original;
         }
@@ -194,7 +195,7 @@ namespace InteractionRange
             var prefix = new HarmonyMethod(typeof(RangePatches), nameof(BeforeUse));
             try
             {
-                foreach (var method in Game.Raycasts) harmony.Patch(method, transpiler: transpiler);
+                foreach (var method in Game.Reach) harmony.Patch(method, transpiler: transpiler);
                 foreach (var method in Game.Uses) harmony.Patch(method, prefix: prefix);
             }
             catch (Exception error)
